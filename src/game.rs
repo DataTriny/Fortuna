@@ -1,13 +1,14 @@
 use crate::actions::PlayerAction;
 use crate::input::selectors::Selectable;
 use std::cmp::min;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Stdin};
 use super::input::CommandVec;
 use super::world::World;
 
 pub struct Game {
 	pub commands: CommandVec,
 	pub is_running: bool,
+	std_in: Stdin,
 	pub world: World
 }
 
@@ -16,12 +17,15 @@ impl Game {
 		Game {
 			commands: CommandVec::new(),
 			is_running: false,
+			std_in: io::stdin(),
 			world: World::new()
 		}
 	}
 	
-	pub fn exit(&mut self) {
-		self.is_running = false;
+	pub fn exit(&mut self) { self.is_running = false; }
+	
+	fn get_user_input(&self) -> String {
+		self.std_in.lock().lines().next().unwrap().unwrap().split_whitespace().collect::<Vec<&str>>().join(" ")
 	}
 	
 	fn perform_action(&mut self, action: PlayerAction) {
@@ -42,11 +46,11 @@ impl Game {
 	}
 	
 	pub fn run(&mut self) {
-		let stdin = io::stdin();
 		self.is_running = true;
 		self.welcome_player();
 		while self.is_running {
-			let input = &stdin.lock().lines().next().unwrap().unwrap();
+			let input = &self.get_user_input();
+			println!("{}", input);
 			let parsed = self.commands.parse(input);
 			if parsed.0 > 0 {
 				let command = self.commands.get_at(parsed.1);
