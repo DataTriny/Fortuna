@@ -1,0 +1,19 @@
+(
+	player: (
+		current_room: 0,
+	),
+	rooms: [
+		(
+			description: "A kitchen.",
+			exits: [
+				( description: "There is an open door to the north.", destination: 1, direction: North )
+			]
+		),
+		(
+			description: "A livingroom.",
+			exits: [
+				( description: "There is an open door to the south.", destination: 0, direction: South )
+			]
+		)
+	]
+)
