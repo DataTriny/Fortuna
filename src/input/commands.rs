@@ -82,11 +82,11 @@ impl GoCommand {
 impl Command for GoCommand {
 	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction {
 		if let Selectable::Direction(dir) = args[0] {
-			if game.world.get_room(game.world.player.current_room).can_go_to(dir) {
-				return PlayerAction::Go(dir);
+			if let Some(exit) = game.world.get_room(game.world.player.current_room).get_exit(dir) {
+				println!("{}", game.world.get_room(exit.destination));
+				return PlayerAction::MoveToRoom(exit.destination);
 			}
 			println!("You cannot go that way.");
-			return PlayerAction::DoNothing;
 		}
 		PlayerAction::DoNothing
 	}
@@ -138,8 +138,7 @@ pub struct LookCommand {
 
 impl Command for LookCommand {
 	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction {
-		let room = game.world.get_room(game.world.player.current_room);
-		println!("{}", room.get_description());
+		println!("{}", game.world.get_room(game.world.player.current_room));
 		PlayerAction::DoNothing
 	}
 	

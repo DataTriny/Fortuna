@@ -1,11 +1,14 @@
+#[macro_use] extern crate enum_primitive;
+#[macro_use] extern crate serde_derive;
+
 pub mod actions;
 pub mod game;
 pub mod input;
 pub mod utils;
 pub mod world;
 
-use self::game::Game;
-use self::input::*;
+use game::Game;
+use input::*;
 
 fn main() {
 	let mut game = Game::new();

@@ -3,6 +3,7 @@ use crate::{
 	utils::compare_words,
 	world::Direction
 };
+use enum_primitive::FromPrimitive;
 use std::fmt;
 use super::CommandVec;
 
@@ -71,6 +72,6 @@ impl Selector for DirectionSelector {
 		if max_length == 0 {
 			return (0, Selectable::Nothing);
 		}
-		(max_length, Selectable::Direction(Direction::from(max_index)))
+		(max_length, Selectable::Direction(Direction::from_usize(max_index).unwrap()))
 	}
 }

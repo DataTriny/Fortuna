@@ -5,7 +5,7 @@ use crate::{
 };
 use std::{
 	cmp::min,
-	io::{self, BufRead, Stdin}
+	io::{self, BufRead, Stdin},
 };
 
 pub struct Game {
@@ -32,17 +32,8 @@ impl Game {
 	fn perform_action(&mut self, action: PlayerAction) {
 		match action {
 			PlayerAction::Exit => self.is_running = false,
-			PlayerAction::Go(dir) => {
-				let current_room = self.world.get_room(self.world.player.current_room);
-				for e in current_room.exits.iter() {
-					if e.direction == dir {
-						self.world.player.current_room = e.destination;
-						println!("{}", self.world.get_room(self.world.player.current_room).get_description());
-						break;
-					}
-				}
-			}
-			PlayerAction::DoNothing => { }
+			PlayerAction::DoNothing => { },
+			_ => self.world.perform_action(action)
 		}
 	}
 	
@@ -81,6 +72,6 @@ impl Game {
 		println!("Welcom to Fortuna!");
 		println!("A text-based game by DataTriny.");
 		println!("Type \"help\" to get a list of available commands.\n");
-		println!("{}", self.world.get_room(self.world.player.current_room).get_description());
+		println!("{}", self.world.get_room(self.world.player.current_room));
 	}
 }

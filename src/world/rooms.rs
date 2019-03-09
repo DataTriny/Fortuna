@@ -1,5 +1,7 @@
+use std::fmt;
 use super::Direction;
 
+#[derive(Deserialize)]
 pub struct Exit {
 	pub description: String,
 	pub destination: usize,
@@ -12,6 +14,7 @@ impl Exit {
 	}
 }
 
+#[derive(Deserialize)]
 pub struct Room {
 	description: String,
 	pub exits: Vec<Exit>
@@ -22,20 +25,22 @@ impl Room {
 		Room { description, exits }
 	}
 	
-	pub fn can_go_to(&self, dir: Direction) -> bool {
+	pub fn get_exit(&self, dir: Direction) -> Option<&Exit> {
 		for e in self.exits.iter() {
 			if e.direction == dir {
-				return true;
+				return Some(e);
 			}
 		}
-		false
+		None
 	}
-	
-	pub fn get_description(&self) -> String {
-		let mut description = self.description.clone();
+}
+
+impl fmt::Display for Room {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.description)?;
 		for e in self.exits.iter() {
-			description.push_str(&format!("\n{}", &e.description));
+			write!(f, "\n{}", e.description)?;
 		}
-		description
+		Ok(())
 	}
 }

@@ -1,3 +1,4 @@
+#[derive(Deserialize)]
 pub struct Player {
 	pub current_room: usize
 }

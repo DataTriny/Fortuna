@@ -1,52 +1,39 @@
 pub mod player;
 pub mod rooms;
 
-use self::player::Player;
-use self::rooms::*;
+use crate::actions::PlayerAction;
+use player::Player;
+use ron::de::from_bytes;
+use rooms::*;
+use serde::Deserialize;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
-pub enum Direction {
-	North,
-	East,
-	South,
-	West
-}
-
-impl From<usize> for Direction {
-	fn from(value: usize) -> Direction {
-		match value {
-			0 => Direction::North,
-			1 => Direction::East,
-			2 => Direction::South,
-			3 => Direction::West,
-			_ => Direction::North
-		}
+enum_from_primitive!{
+	#[derive(Clone, Copy, Deserialize, Eq, PartialEq)]
+	pub enum Direction {
+		North,
+		East,
+		South,
+		West
 	}
 }
 
+#[derive(Deserialize)]
 pub struct World {
 	pub player: Player,
 	rooms: Vec<Room>
 }
 
 impl World {
-	pub fn new() -> World {
-		World {
-			player: Player::new(0),
-			rooms: World::create_rooms()
-		}
-	}
-	
-	fn create_rooms() -> Vec<Room> {
-		vec![
-			Room::new(String::from("A kitchen"), vec![
-				Exit::new(Direction::North, 1, String::from("There is an open door to the north."))
-			]),
-			Room::new(String::from("A livingroom"), vec![
-				Exit::new(Direction::South, 0, String::from("There is an open door to the south."))
-			])
-		]
+	pub fn new() -> Self {
+		from_bytes(include_bytes!("../../world.ron")).unwrap()
 	}
 	
 	pub fn get_room(&self, id: usize) -> &Room { &self.rooms[id] }
+	
+	pub fn perform_action(&mut self, action: PlayerAction) {
+		match action {
+			PlayerAction::MoveToRoom(room_id) => self.player.current_room = room_id,
+			_ => { }
+		}
+	}
 }
