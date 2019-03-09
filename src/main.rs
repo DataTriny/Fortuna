@@ -5,13 +5,13 @@ pub mod utils;
 pub mod world;
 
 use self::game::Game;
-use self::input::commands::*;
+use self::input::*;
 
 fn main() {
 	let mut game = Game::new();
-	game.commands.add(Box::new(ExitCommand::new()));
-	game.commands.add(Box::new(HelpCommand::new()));
-	game.commands.add(Box::new(GoCommand::new()));
-	game.commands.add(Box::new(LookCommand::new()));
+	game.commands.push(Box::new(HelpCommand::new()));
+	game.commands.push(Box::new(ExitCommand::default()));
+	game.commands.push(Box::new(GoCommand::new()));
+	game.commands.push(Box::new(LookCommand::default()));
 	game.run();
 }
