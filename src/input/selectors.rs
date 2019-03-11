@@ -1,67 +1,37 @@
 use crate::{
 	game::Game,
+	Named,
 	utils::compare_words,
-	world::Direction
+	world::{Direction, objects::Object}
 };
 use enum_primitive::FromPrimitive;
-use std::fmt;
-use super::CommandVec;
+use super::InputParser;
 
 #[derive(PartialEq)]
 pub enum Selectable {
 	Command(usize),
 	Direction(Direction),
-	Nothing
-}
-
-pub trait Selector {
-	fn get_error_message(&self) -> &str;
-	
-	fn get_name(&self) -> &str;
-	
-	fn is_optional(&self) -> bool;
-	
-	fn parse(&self, game: &Game, input: &str) -> (usize, Selectable);
-}
-
-impl fmt::Display for Selector {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self.is_optional() {
-			true => write!(f, "[{}]", self.get_name()),
-			false => write!(f, "{}", self.get_name())
-		}
-	}
+	Nothing,
+	Object(usize)
 }
 
 pub struct CommandSelector;
 
-impl Selector for CommandSelector {
-	fn is_optional(&self) -> bool { true }
-	
-	fn get_error_message(&self) -> &str { "Please provide a valid command name." }
-	
-	fn get_name(&self) -> &str { "command" }
-	
+impl InputParser for CommandSelector {
 	fn parse(&self, game: &Game, input: &str) -> (usize, Selectable) {
-		match game.commands.parse(input) {
+		match game.commands.parse(game, input) {
 			(0, _) => (0, Selectable::Nothing),
-			(i, j) => (i, Selectable::Command(j))
+			(i, j) => (i, j)
 		}
 	}
 }
 
 pub struct DirectionSelector;
 
-impl Selector for DirectionSelector {
-	fn is_optional(&self) -> bool { false }
-	
-	fn get_error_message(&self) -> &str { "Please provide a valid direction." }
-	
-	fn get_name(&self) -> &str { "direction" }
-	
+impl InputParser for DirectionSelector {
 	fn parse(&self, game: &Game, input: &str) -> (usize, Selectable) {
-		let mut max_length = 0;
 		let mut max_index = 0;
+		let mut max_length = 0;
 		for (i, dir) in vec!["north", "east", "south", "west"].iter().enumerate() {
 			let cmp = compare_words(input, dir);
 			if cmp > max_length {
@@ -73,5 +43,25 @@ impl Selector for DirectionSelector {
 			return (0, Selectable::Nothing);
 		}
 		(max_length, Selectable::Direction(Direction::from_usize(max_index).unwrap()))
+	}
+}
+
+pub struct CurrentPlaceObjectSelector;
+
+impl InputParser for CurrentPlaceObjectSelector {
+	fn parse(&self, game: &Game, input: &str) -> (usize, Selectable) {
+		let mut max_index = 0;
+		let mut max_length = 0;
+		for (i, o) in game.world.get_place(game.world.player.current_place).objects.iter().enumerate() {
+			let cmp = o.find(input);
+			if cmp > max_length {
+				max_index = i;
+				max_length = cmp;
+			}
+		}
+		if max_length == 0 {
+			return (0, Selectable::Nothing);
+		}
+		(max_length, Selectable::Object(max_index))
 	}
 }

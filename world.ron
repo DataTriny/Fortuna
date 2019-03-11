@@ -1,19 +1,21 @@
 (
-	player: (
-		current_room: 0,
-	),
-	rooms: [
+	places: [
 		(
 			description: "A kitchen.",
-			exits: [
-				( description: "There is an open door to the north.", destination: 1, direction: North )
+			objects: [
+				( aliases: [ "door" ], carryable: false, description: "There is an open door to the north.", kind: Exit(Exit(destination: 1, direction: North)) ),
+				( aliases: [ "sword" ], carryable: true, description: "A rusty sword.", kind: Weapon(Weapon(damages: 5, durability: 8)) )
 			]
 		),
 		(
 			description: "A livingroom.",
-			exits: [
-				( description: "There is an open door to the south.", destination: 0, direction: South )
+			objects: [
+				( aliases: [ "door" ], carryable: false, description: "There is an open door to the south.", kind: Exit(Exit(destination: 0, direction: South)) )
 			]
 		)
-	]
+	],
+	player: (
+		current_place: 0,
+		inventory: [ ]
+	)
 )

@@ -1,24 +1,65 @@
 use crate::{
-	actions::PlayerAction,
-	game::Game,
-	utils::compare_words
+	game::{Game, GameAction},
+	Named,
+	world::{
+		objects::{Exit, ObjectKind},
+		WorldAction
+	}
 };
 use std::fmt;
-use super::selectors::*;
+use super::{InputParser, selectors::*};
 
-pub trait Command {
-	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction;
+pub struct Parameter {
+	description: String,
+	pub error_message: Option<String>,
+	pub is_optional: bool,
+	name: String,
+	selector: Box<InputParser>
+}
+
+impl Parameter {
+	fn get_signature(&self) -> String {
+		match self.is_optional {
+			true => format!("[{}]", self.name),
+			false => self.name.clone()
+		}
+	}
 	
-	fn get_description(&self) -> &str;
+	pub fn optional(name: String, description: String, selector: Box<InputParser>) -> Self {
+		Self { description, error_message: None, is_optional: true, name, selector }
+	}
 	
-	fn get_name(&self) -> &str;
+	pub fn required(name: String, description: String, error_message: String, selector: Box<InputParser>) -> Self {
+		Self { description, error_message: Some(error_message), is_optional: false, name, selector }
+	}
+}
+
+impl fmt::Display for Parameter {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.name)?;
+		if self.is_optional {
+			write!(f, " (optional)")?;
+		}
+		write!(f, ": {}", self.description)
+	}
 	
-	fn get_selectors(&self) -> &Vec<Box<Selector>>;
+}
+
+impl InputParser for Parameter {
+	fn parse(&self, game: &Game, input: &str) -> (usize, Selectable) {
+		self.selector.parse(game, input)
+	}
+}
+
+pub trait Command: Named {
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction;
+	
+	fn get_parameters(&self) -> &[Parameter];
 	
 	fn get_signature(&self) -> String {
-		let mut signature = String::from(self.get_name());
-		for s in self.get_selectors() {
-			signature.push_str(&format!(" {}", s));
+		let mut signature = self.get_aliases()[0].clone();
+		for p in self.get_parameters() {
+			signature.push_str(&format!(" {}", p.get_signature()));
 		}
 		signature
 	}
@@ -26,92 +67,108 @@ pub trait Command {
 
 impl fmt::Display for Command {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}\n\n{}", self.get_signature(), self.get_description())
-	}
-}
-
-pub trait CommandVec {
-	fn parse(&self, input: &str) -> (usize, usize);
-}
-
-impl CommandVec for Vec<Box<Command>> {
-	fn parse(&self, input: &str) -> (usize, usize) {
-		let mut max_length = 0;
-		let mut max_index = 0;
-		for (i, cmd) in self.iter().enumerate() {
-			let cmp = compare_words(input, cmd.get_name());
-			if cmp > max_length {
-				max_length = cmp;
-				max_index = i;
+		write!(f, "{}\n\n{}", self.get_signature(), self.get_description())?;
+		let parameters = self.get_parameters();
+		if parameters.len() > 0 {
+			write!(f, "\n")?;
+			for p in parameters {
+				write!(f, "\n{}", p)?;
 			}
 		}
-		(max_length, max_index)
+		Ok(())
 	}
 }
 
-#[derive(Default)]
 pub struct ExitCommand {
-	selectors: Vec<Box<Selector>>
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
+}
+
+impl ExitCommand {
+	pub fn new() -> Self {
+		Self {
+			aliases: vec!["exit".to_string(), "quit".to_string()],
+			description: "Exit the game.".to_string(),
+			parameters: vec![]
+		}
+	}
 }
 
 impl Command for ExitCommand {
-	fn execute(&self, _: &Game, _: Vec<Selectable>) -> PlayerAction {
+	fn execute(&self, _: &Game, _: Vec<Selectable>) -> GameAction {
 		println!("Goodbye!");
-		PlayerAction::Exit
+		GameAction::Exit
 	}
 	
-	fn get_description(&self) -> &str { "Exit the game." }
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
+}
+
+impl Named for ExitCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
 	
-	fn get_name(&self) -> &str { "exit" }
-	
-	fn get_selectors(&self) -> &Vec<Box<Selector>> { &self.selectors }
+	fn get_description(&self) -> &str { &self.description }
 }
 
 pub struct GoCommand {
-	selectors: Vec<Box<Selector>>
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
 }
 
 impl GoCommand {
 	pub fn new() -> Self {
 		Self {
-			selectors: vec![Box::new(DirectionSelector { })]
+			aliases: vec!["go".to_string(), "walk".to_string()],
+			description: "Move in a given direction.".to_string(),
+			parameters: vec![Parameter::required(
+				"direction".to_string(), "The direction in which you want to go.".to_string(), "Go where?".to_string(), Box::new(DirectionSelector { }))]
 		}
 	}
 }
 
 impl Command for GoCommand {
-	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction {
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction {
 		if let Selectable::Direction(dir) = args[0] {
-			if let Some(exit) = game.world.get_room(game.world.player.current_room).get_exit(dir) {
-				println!("{}", game.world.get_room(exit.destination));
-				return PlayerAction::MoveToRoom(exit.destination);
+			if let Some(exit) = game.world.get_place(game.world.player.current_place).get_exit(dir) {
+				if let ObjectKind::Exit(Exit { destination, .. }) = exit.kind {
+					println!("{}", game.world.get_place(destination));
+					return GameAction::WorldAction(WorldAction::MoveToPlace(destination));
+				}
 			}
 			println!("You cannot go that way.");
 		}
-		PlayerAction::DoNothing
+		GameAction::DoNothing
 	}
 	
-	fn get_description(&self) -> &str { "Move in a given direction." }
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
+}
+
+impl Named for GoCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
 	
-	fn get_name(&self) -> &str { "go" }
-	
-	fn get_selectors(&self) -> &Vec<Box<Selector>> { &self.selectors }
+	fn get_description(&self) -> &str { &self.description }
 }
 
 pub struct HelpCommand {
-	selectors: Vec<Box<Selector>>
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
 }
 
 impl HelpCommand {
 	pub fn new() -> Self {
 		Self {
-			selectors: vec![Box::new(CommandSelector { })]
+			aliases: vec!["help".to_string()],
+			description: "Get a list of all available commands, or get more information on a particular one.".to_string(),
+			parameters: vec![Parameter::optional(
+				"command".to_string(), "The command for which you want to get some help.".to_string(), Box::new(CommandSelector { }))]
 		}
 	}
 }
 
 impl Command for HelpCommand {
-	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction {
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction {
 		if let Selectable::Command(i) = args[0] {
 			println!("{}", game.commands[i]);
 		}
@@ -121,30 +178,123 @@ impl Command for HelpCommand {
 				println!(" - {}", command.get_signature());
 			}
 		}
-		PlayerAction::DoNothing
+		GameAction::DoNothing
 	}
 	
-	fn get_description(&self) -> &str { "Get a list of all available commands, or get more information on a particular one." }
-	
-	fn get_name(&self) -> &str { "help" }
-	
-	fn get_selectors(&self) -> &Vec<Box<Selector>> { &self.selectors }
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
 }
 
-#[derive(Default)]
+impl Named for HelpCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
+	
+	fn get_description(&self) -> &str { &self.description }
+}
+
+pub struct InventoryCommand {
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
+}
+
+impl InventoryCommand {
+	pub fn new() -> Self {
+		Self {
+			aliases: vec!["inventory".to_string()],
+			description: "Look at what you are carrying.".to_string(),
+			parameters: vec![]
+		}
+	}
+}
+
+impl Command for InventoryCommand {
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction {
+		if game.world.player.inventory.len() > 0 {
+			println!("You are carrying:");
+			for o in game.world.player.inventory.iter() {
+				println!(" - {}", o.get_aliases()[0]);
+			}
+		}
+		else {
+			println!("You are not carrying anything.");
+		}
+		GameAction::DoNothing
+	}
+	
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
+}
+
+impl Named for InventoryCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
+	
+	fn get_description(&self) -> &str { &self.description }
+}
+
 pub struct LookCommand {
-	selectors: Vec<Box<Selector>>
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
+}
+
+impl LookCommand {
+	pub fn new() -> Self {
+		Self {
+			aliases: vec!["look".to_string()],
+			description: "Look around.".to_string(),
+			parameters: vec![]
+		}
+	}
 }
 
 impl Command for LookCommand {
-	fn execute(&self, game: &Game, args: Vec<Selectable>) -> PlayerAction {
-		println!("{}", game.world.get_room(game.world.player.current_room));
-		PlayerAction::DoNothing
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction {
+		println!("{}", game.world.get_place(game.world.player.current_place));
+		GameAction::DoNothing
 	}
 	
-	fn get_description(&self) -> &str { "Look around." }
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
+}
+
+impl Named for LookCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
 	
-	fn get_name(&self) -> &str { "look" }
+	fn get_description(&self) -> &str { &self.description }
+}
+
+pub struct TakeCommand {
+	aliases: Vec<String>,
+	description: String,
+	parameters: Vec<Parameter>
+}
+
+impl TakeCommand {
+	pub fn new() -> Self {
+		Self {
+			aliases: vec!["take".to_string(), "grab".to_string()],
+			description: "Take an item nearby you.".to_string(),
+			parameters: vec![
+				Parameter::required("item".to_string(), "The name of the item you want to take.".to_string(), "What do you want to take?".to_string(), Box::new(CurrentPlaceObjectSelector { }))]
+		}
+	}
+}
+
+impl Command for TakeCommand {
+	fn execute(&self, game: &Game, args: Vec<Selectable>) -> GameAction {
+		if let Selectable::Object(object_id) = args[0] {
+			let object = &game.world.get_place(game.world.player.current_place).objects[object_id];
+			if object.carryable {
+				println!("You took {}.", object.get_aliases()[0]);
+				return GameAction::WorldAction(WorldAction::TakeItem(object_id))
+			}
+		}
+		println!("You can't take that!");
+		GameAction::DoNothing
+	}
 	
-	fn get_selectors(&self) -> &Vec<Box<Selector>> { &self.selectors }
+	fn get_parameters(&self) -> &[Parameter] { &self.parameters }
+}
+
+impl Named for TakeCommand {
+	fn get_aliases(&self) -> &[String] { &self.aliases }
+	
+	fn get_description(&self) -> &str { &self.description }
 }

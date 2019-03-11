@@ -1,7 +1,6 @@
 use crate::{
-	actions::PlayerAction,
-	input::{Command, CommandVec, selectors::Selectable},
-	world::World
+	input::{Command, InputParser, selectors::Selectable},
+	world::{WorldAction, World}
 };
 use std::{
 	cmp::min,
@@ -29,11 +28,11 @@ impl Game {
 		self.std_in.lock().lines().next().unwrap().unwrap().split_whitespace().collect::<Vec<&str>>().join(" ")
 	}
 	
-	fn perform_action(&mut self, action: PlayerAction) {
+	fn perform_action(&mut self, action: GameAction) {
 		match action {
-			PlayerAction::Exit => self.is_running = false,
-			PlayerAction::DoNothing => { },
-			_ => self.world.perform_action(action)
+			GameAction::DoNothing => { },
+			GameAction::Exit => self.is_running = false,
+			GameAction::WorldAction(action) => self.world.perform_action(action)
 		}
 	}
 	
@@ -42,16 +41,16 @@ impl Game {
 		self.welcome_player();
 		while self.is_running {
 			let input = &self.get_user_input();
-			let parsed = self.commands.parse(input);
-			if parsed.0 > 0 {
-				let command = &self.commands[parsed.1];
+			let parsed = self.commands.parse(self, input);
+			if let Selectable::Command(command_id) = parsed.1 {
+				let command = &self.commands[command_id];
 				let mut args = Vec::new();
 				let mut offset = min(parsed.0 + 1, input.len());
 				let mut has_error = false;
-				for selector in command.get_selectors() {
-					let selected = selector.parse(self, &input[offset..]);
-					if !selector.is_optional() && selected.1 == Selectable::Nothing {
-						println!("Error: {}", selector.get_error_message());
+				for parameter in command.get_parameters() {
+					let selected = parameter.parse(self, &input[offset..]);
+					if !parameter.is_optional && selected.1 == Selectable::Nothing {
+						println!("{}", parameter.error_message.as_ref().unwrap());
 						has_error = true;
 						break;
 					}
@@ -72,6 +71,12 @@ impl Game {
 		println!("Welcom to Fortuna!");
 		println!("A text-based game by DataTriny.");
 		println!("Type \"help\" to get a list of available commands.\n");
-		println!("{}", self.world.get_room(self.world.player.current_room));
+		println!("{}", self.world.get_place(self.world.player.current_place));
 	}
+}
+
+pub enum GameAction {
+	DoNothing,
+	Exit,
+	WorldAction(WorldAction)
 }

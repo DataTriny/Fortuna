@@ -1,10 +1,10 @@
+pub mod objects;
+pub mod places;
 pub mod player;
-pub mod rooms;
 
-use crate::actions::PlayerAction;
 use player::Player;
 use ron::de::from_bytes;
-use rooms::*;
+use places::*;
 use serde::Deserialize;
 
 enum_from_primitive!{
@@ -20,7 +20,7 @@ enum_from_primitive!{
 #[derive(Deserialize)]
 pub struct World {
 	pub player: Player,
-	rooms: Vec<Room>
+	places: Vec<Place>
 }
 
 impl World {
@@ -28,12 +28,17 @@ impl World {
 		from_bytes(include_bytes!("../../world.ron")).unwrap()
 	}
 	
-	pub fn get_room(&self, id: usize) -> &Room { &self.rooms[id] }
+	pub fn get_place(&self, id: usize) -> &Place { &self.places[id] }
 	
-	pub fn perform_action(&mut self, action: PlayerAction) {
+	pub fn perform_action(&mut self, action: WorldAction) {
 		match action {
-			PlayerAction::MoveToRoom(room_id) => self.player.current_room = room_id,
-			_ => { }
+			WorldAction::MoveToPlace(place_id) => self.player.current_place = place_id,
+			WorldAction::TakeItem(object_id) => self.player.inventory.push(self.places[self.player.current_place].objects.remove(object_id))
 		}
 	}
+}
+
+pub enum WorldAction {
+	MoveToPlace(usize),
+	TakeItem(usize)
 }
